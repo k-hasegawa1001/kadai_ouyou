@@ -8,6 +8,7 @@ services:
     depends_on:
       - nginx
       - httpd
+      - backend # proxyがbackendにも依存するように追加
     networks:
       - kadai-ouyou-net
     volumes:
@@ -27,6 +28,38 @@ services:
     volumes:
       - ./logs/httpd:/usr/local/apache2/logs
 
+  # --- ここから追加 ---
+  backend:
+    build: ./backend
+    networks:
+      - kadai-ouyou-net
+    depends_on:
+      - db # DBが起動した後にバックエンドを起動する
+    environment:
+      # バックエンドのアプリケーション内で使用する環境変数
+      - DB_HOST=db
+      - DB_USER=app_user
+      - DB_PASSWORD=app_password
+      - DB_NAME=app_db
+
+  db:
+    image: mysql:8.0
+    networks:
+      - kadai-ouyou-net
+    environment:
+      # MySQLコンテナの初期設定用環境変数
+      - MYSQL_ROOT_PASSWORD=root_secret
+      - MYSQL_DATABASE=app_db
+      - MYSQL_USER=app_user
+      - MYSQL_PASSWORD=app_password
+    volumes:
+      # DBのデータをEC2インスタンス（ホスト側）に永続化
+      - test-ouyou-data:/var/lib/mysql
+
 networks:
   kadai-ouyou-net:
     driver: bridge
+
+# MySQLのデータを永続化するためのボリューム定義（ファイルの末尾に追加）
+volumes:
+  test-ouyou-data:
