@@ -1,0 +1,26 @@
+version: "3"
+
+services:
+  proxy:
+    build: ./proxy
+    ports:
+      - "80:80"
+    depends_on:
+      - nginx
+      - httpd
+    networks:
+      - kadai-ouyou-net
+
+  nginx:
+    build: ./nginx
+    networks:
+      - kadai-ouyou-net
+
+  httpd:
+    build: ./httpd
+    networks:
+      - kadai-ouyou-net
+
+networks:
+  kadai-ouyou-net:
+    driver: bridge
