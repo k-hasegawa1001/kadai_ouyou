@@ -1,4 +1,5 @@
 import os
+import time
 import mysql.connector
 from flask import Flask, request, jsonify
 
@@ -18,31 +19,36 @@ def get_db_connection():
         database=DB_NAME
     )
 
-# 起動時にテーブルを作成する処理（初期化用）
+# 起動時にテーブルを作成する処理（リトライ機能付き）
 def init_db():
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        # contactsテーブルが存在しなければ作成する
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS contacts (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                message TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-        cursor.close()
-        conn.close()
-        print("Database initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing database: {e}")
+    retries = 10  # 最大10回リトライする
+    while retries > 0:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS contacts (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print("Database initialized successfully.")
+            return  # 成功したら関数を終了
+        except Exception as e:
+            print(f"Database not ready yet, retrying in 3 seconds... ({e})")
+            retries -= 1
+            time.sleep(3)  # 3秒待機して再トライ
+            
+    print("Could not connect to database after several retries.")
 
 # フロントエンドからリクエストを受け取るエンドポイント
 @app.route('/api/submit', methods=['POST'])
 def submit_form():
-    # JavaScriptから送信されたJSONデータを取得
     data = request.get_json()
 
     if not data or 'name' not in data or 'message' not in data:
@@ -55,7 +61,6 @@ def submit_form():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # 【重要】プレースホルダー（%s）を使用してSQLインジェクションを防止する
         sql = "INSERT INTO contacts (name, message) VALUES (%s, %s)"
         val = (name, message)
         
@@ -68,11 +73,8 @@ def submit_form():
         return jsonify({'message': 'Data saved successfully!'}), 201
 
     except Exception as e:
-        # エラーが発生した場合は500エラーを返す
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # アプリケーション起動前にDBの初期化を実行
     init_db()
-    # Dockerコンテナの外部（プロキシ等）からアクセスできるよう host='0.0.0.0' に設定
     app.run(host='0.0.0.0', port=5000)
