@@ -10,16 +10,22 @@ services:
       - httpd
     networks:
       - kadai-ouyou-net
+    volumes:
+      - ./logs/proxy:/var/log/nginx
 
   nginx:
     build: ./nginx
     networks:
       - kadai-ouyou-net
+    volumes:
+      - ./logs/nginx:/var/log/nginx
 
   httpd:
     build: ./httpd
     networks:
       - kadai-ouyou-net
+    volumes:
+      - ./logs/httpd:/usr/local/apache2/logs
 
 networks:
   kadai-ouyou-net:
